@@ -29,6 +29,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import ContactPage from "./pages/ContactPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import { IssuerTenderManagePage } from "./pages/IssuerTenderManagePage";
+import TenderApplicationPage from "./pages/TenderApplicationPage";
 
 function App() {
   return (
@@ -43,6 +44,14 @@ function App() {
               <Route path="/register" element={<RegisterForm />} />
               <Route path="/tenders" element={<TenderListPage />} />
               <Route path="/tenders/:id" element={<TenderDetailPage />} />
+              <Route
+                path="/tenders/:id/apply"
+                element={
+                  <ProtectedRoute allowedRoles={["bidder"]}>
+                    <TenderApplicationPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/unauthorized" element={<UnauthorizedPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/profile/:id" element={<PublicProfilePage />} />

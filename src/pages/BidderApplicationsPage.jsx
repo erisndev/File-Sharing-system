@@ -35,15 +35,16 @@ import {
   Calendar,
   DollarSign,
 } from "lucide-react";
+import { applicationAPI } from "@/services/api";
 
 export const BidderApplicationsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+
   const { mine, loadingMine, fetchMine } = useApplications();
 
   useEffect(() => {
     fetchMine();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getStatusColor = (status) => {
@@ -81,9 +82,15 @@ export const BidderApplicationsPage = () => {
   const filteredApplications = useMemo(() => {
     const list = Array.isArray(mine) ? mine : [];
     return list.filter((application) => {
-      const tenderTitle = application?.tender?.title || application?.tenderTitle || "";
-      const company = application?.tender?.issuer || application?.company || "";
-      const category = application?.tender?.category || application?.category || "";
+      const tenderTitle =
+        application?.tender?.title || application?.tenderTitle || "";
+      const company =
+        application?.tender?.createdBy?.name ||
+        application?.tender?.issuer ||
+        application?.company ||
+        "";
+      const category =
+        application?.tender?.category || application?.category || "";
       const status = (application?.status || "").toLowerCase();
 
       const matchesSearch =
@@ -91,12 +98,26 @@ export const BidderApplicationsPage = () => {
         company.toLowerCase().includes(searchTerm.toLowerCase()) ||
         category.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus =
-        filterStatus === "all" || status === filterStatus;
+      const matchesStatus = filterStatus === "all" || status === filterStatus;
 
       return matchesSearch && matchesStatus;
     });
   }, [mine, searchTerm, filterStatus]);
+
+  const handleWithdraw = async (applicationId) => {
+    if (!window.confirm("Withdraw this application?")) return;
+    try {
+      await applicationAPI.withdraw(applicationId);
+      await fetchMine();
+    } catch (e) {
+      alert(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Failed to withdraw application"
+      );
+    }
+  };
 
   return (
     <Layout showSidebar>
@@ -126,7 +147,7 @@ export const BidderApplicationsPage = () => {
                     Total Applications
                   </p>
                   <p className="text-3xl font-bold text-blue-900">
-                    {loadingMine ? "-" : (mine?.length || 0)}
+                    {loadingMine ? "-" : mine?.length || 0}
                   </p>
                 </div>
                 <FileText className="h-8 w-8 text-blue-600" />
@@ -139,7 +160,13 @@ export const BidderApplicationsPage = () => {
                 <div>
                   <p className="text-yellow-600 text-sm font-medium">Pending</p>
                   <p className="text-3xl font-bold text-yellow-900">
-                    {loadingMine ? "-" : (mine || []).filter((a) => ["pending", "in review", "review"].includes((a?.status || "").toLowerCase())).length}
+                    {loadingMine
+                      ? "-"
+                      : (mine || []).filter((a) =>
+                          ["pending", "in review", "review"].includes(
+                            (a?.status || "").toLowerCase()
+                          )
+                        ).length}
                   </p>
                 </div>
                 <Clock className="h-8 w-8 text-yellow-600" />
@@ -152,7 +179,13 @@ export const BidderApplicationsPage = () => {
                 <div>
                   <p className="text-green-600 text-sm font-medium">Accepted</p>
                   <p className="text-3xl font-bold text-green-900">
-                    {loadingMine ? "-" : (mine || []).filter((a) => ["accepted", "approved"].includes((a?.status || "").toLowerCase())).length}
+                    {loadingMine
+                      ? "-"
+                      : (mine || []).filter((a) =>
+                          ["accepted", "approved"].includes(
+                            (a?.status || "").toLowerCase()
+                          )
+                        ).length}
                   </p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-600" />
@@ -165,7 +198,11 @@ export const BidderApplicationsPage = () => {
                 <div>
                   <p className="text-red-600 text-sm font-medium">Rejected</p>
                   <p className="text-3xl font-bold text-red-900">
-                    {loadingMine ? "-" : (mine || []).filter((a) => (a?.status || "").toLowerCase() === "rejected").length}
+                    {loadingMine
+                      ? "-"
+                      : (mine || []).filter(
+                          (a) => (a?.status || "").toLowerCase() === "rejected"
+                        ).length}
                   </p>
                 </div>
                 <XCircle className="h-8 w-8 text-red-600" />
@@ -199,13 +236,19 @@ export const BidderApplicationsPage = () => {
                     <DropdownMenuItem onClick={() => setFilterStatus("all")}>
                       All Status
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterStatus("pending")}>
+                    <DropdownMenuItem
+                      onClick={() => setFilterStatus("pending")}
+                    >
                       Pending
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterStatus("accepted")}>
+                    <DropdownMenuItem
+                      onClick={() => setFilterStatus("accepted")}
+                    >
                       Accepted
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterStatus("rejected")}>
+                    <DropdownMenuItem
+                      onClick={() => setFilterStatus("rejected")}
+                    >
                       Rejected
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -231,34 +274,54 @@ export const BidderApplicationsPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {loadingMine ? (
             [...Array(6)].map((_, idx) => (
-              <Card key={idx} className="border-0 shadow-lg">
+              <Card key={`skeleton-${idx}`} className="border-0 shadow-lg">
                 <CardContent className="p-4">
-                  <div className="h-24 bg-gray-100 rounded" />
+                  <div className="h-24 bg-gray-100 rounded animate-pulse" />
                 </CardContent>
               </Card>
             ))
           ) : filteredApplications.length > 0 ? (
             filteredApplications.map((application) => {
-              const tenderTitle = application?.tender?.title || application?.tenderTitle;
-              const company = application?.tender?.issuer || application?.company;
-              const submittedAt = application?.createdAt || application?.submittedAt;
-              const deadline = application?.tender?.deadline || application?.deadline;
-              const bidAmount = application?.bidAmount || application?.amount || application?.offerAmount;
-              const category = application?.tender?.category || application?.category;
+              const tenderTitle =
+                application?.tender?.title ||
+                application?.tenderTitle ||
+                "Untitled";
+
+              const issuer =
+                application?.tender?.createdBy?.name ||
+                application?.tender?.issuer ||
+                "Unknown";
+
+              const deadline =
+                application?.tender?.deadline || application?.deadline || "-";
+              const category =
+                application?.tender?.category || application?.category || "-";
+
+              const bidAmount =
+                application?.bidAmount ||
+                application?.amount ||
+                application?.offerAmount;
+              const submittedAt =
+                application?.createdAt || application?.submittedAt;
+              const submittedBy = issuer;
 
               return (
                 <Card
-                  key={application.id}
+                  key={application._id}
                   className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group"
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <Badge
-                        className={getStatusColor((application?.status || "").toLowerCase())}
+                        className={getStatusColor(
+                          (application?.status || "").toLowerCase()
+                        )}
                         variant="outline"
                       >
                         <div className="flex items-center gap-1">
-                          {getStatusIcon((application?.status || "").toLowerCase())}
+                          {getStatusIcon(
+                            (application?.status || "").toLowerCase()
+                          )}
                           {(application?.status || "Pending").toString()}
                         </div>
                       </Badge>
@@ -274,7 +337,10 @@ export const BidderApplicationsPage = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <Link to={`/bidder/applications/${application.id}`} className="flex items-center">
+                            <Link
+                              to={`/bidder/applications/${application._id}`}
+                              className="flex items-center"
+                            >
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </Link>
@@ -287,7 +353,10 @@ export const BidderApplicationsPage = () => {
                             <Download className="mr-2 h-4 w-4" />
                             Download Documents
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => handleWithdraw(application._id)}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Withdraw Application
                           </DropdownMenuItem>
@@ -297,33 +366,50 @@ export const BidderApplicationsPage = () => {
                     <CardTitle className="text-lg group-hover:text-green-600 transition-colors">
                       {tenderTitle}
                     </CardTitle>
-                    <CardDescription>
-                      Issued by {company}
-                    </CardDescription>
+                    <CardDescription>Issued by: {issuer}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-1 text-green-600">
-                        <DollarSign className="h-4 w-4" />
-                        <span className="font-semibold">
-                          {bidAmount || "-"}
-                        </span>
+                    <div className="p-3 border rounded-md bg-gray-50 dark:bg-gray-800 text-sm">
+                      <div className="flex justify-between">
+                        <div className="flex items-center gap-1 text-green-600">
+                          <DollarSign className="h-4 w-4" />
+                          <span className="font-semibold">
+                            {bidAmount || "-"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-gray-500">
+                          <Calendar className="h-4 w-4" />
+                          <span>
+                            {deadline
+                              ? new Date(deadline).toISOString().split("T")[0]
+                              : "-"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 text-gray-500">
-                        <Calendar className="h-4 w-4" />
-                        <span>{deadline || "-"}</span>
+                      <div className="flex justify-between mt-1">
+                        <div className="flex items-center gap-1 text-blue-600">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            Submitted{" "}
+                            {submittedAt
+                              ? new Date(submittedAt)
+                                  .toISOString()
+                                  .split("T")[0]
+                              : "-"}{" "}
+                            by {submittedBy}
+                          </span>
+                        </div>
+                        <Badge variant="secondary">{category}</Badge>
                       </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-1 text-blue-600">
-                        <Clock className="h-4 w-4" />
-                        <span>Applied {submittedAt ? new Date(submittedAt).toLocaleDateString() : "-"}</span>
-                      </div>
-                      <Badge variant="secondary">{category || "-"}</Badge>
                     </div>
                     <div className="pt-2 border-t">
-                      <Button asChild className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700">
-                        <Link to={`/bidder/applications/${application.id}`}>View Application</Link>
+                      <Button
+                        asChild
+                        className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
+                      >
+                        <Link to={`/bidder/applications/${application._id}`}>
+                          View Application
+                        </Link>
                       </Button>
                     </div>
                   </CardContent>

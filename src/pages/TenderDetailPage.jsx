@@ -1,156 +1,143 @@
-import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-// import { useTender } from "../contexts/TenderContext";
-import { useAuth } from "../contexts/useAuth";
-import Layout from "../components/layout/Layout";
-import { Button } from "../components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
-import { Separator } from "../components/ui/separator";
-import { Alert, AlertDescription } from "../components/ui/alert";
+// src/pages/TenderDetailPage.jsx
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { applicationAPI, tenderAPI } from "@/services/api";
+import Layout from "@/components/layout/Layout";
 import {
   Calendar,
   DollarSign,
-  Users,
   Building,
+  Mail,
+  Phone,
   FileText,
-  Download,
-  MessageSquare,
   ArrowLeft,
+  User,
   Clock,
   CheckCircle,
-  AlertTriangle,
+  AlertCircle,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/useAuth";
+
+const formatCurrency = (amount) => {
+  if (!amount) return "Not specified";
+  return new Intl.NumberFormat("en-ZA", {
+    style: "currency",
+    currency: "ZAR",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return "Not specified";
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-ZA", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
+const getDeadlineStatus = (deadline) => {
+  if (!deadline)
+    return { status: "unknown", color: "gray", text: "No deadline" };
+
+  const now = new Date();
+  const deadlineDate = new Date(deadline);
+  const daysLeft = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+
+  if (daysLeft < 0) {
+    return {
+      status: "expired",
+      color: "red",
+      text: "Expired",
+      icon: AlertCircle,
+    };
+  } else if (daysLeft <= 7) {
+    return {
+      status: "urgent",
+      color: "orange",
+      text: `${daysLeft} days left`,
+      icon: Clock,
+    };
+  } else {
+    return {
+      status: "open",
+      color: "green",
+      text: `${daysLeft} days left`,
+      icon: CheckCircle,
+    };
+  }
+};
 
 const TenderDetailPage = () => {
   const { id } = useParams();
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const [tender, setTender] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [checkingApplication, setCheckingApplication] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Simulate API call to fetch tender details
     const fetchTender = async () => {
-      setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Mock tender data - replace with actual API call
-      const mockTender = {
-        id: parseInt(id),
-        title: "Website Development Project",
-        description: `We are looking for a skilled full-stack developer to build a modern e-commerce website. The project involves creating a responsive web application with user authentication, product catalog, shopping cart, and payment integration.
-
-Key requirements include:
-- Modern, responsive design that works across all devices
-- User registration and authentication system
-- Product management and catalog display
-- Shopping cart and checkout functionality
-- Payment gateway integration (Stripe/PayPal)
-- Admin dashboard for order and product management
-- SEO optimization and performance optimization
-
-The ideal candidate should have experience with React.js, Node.js, and modern web development practices. Knowledge of e-commerce platforms and payment integrations is highly preferred.`,
-        category: "Web Development",
-        budget: "$5,000 - $10,000",
-        deadline: "2025-02-15",
-        status: "active",
-        issuer: "TechCorp Inc.",
-        issuerContact: "john.smith..techcorp.com",
-        requirements: [
-          "React.js",
-          "Node.js",
-          "MongoDB",
-          "Payment Integration",
-          "Responsive Design",
-          "API Development",
-          "Testing",
-          "Deployment",
-        ],
-        files: [
-          {
-            id: 1,
-            name: "requirements.pdf",
-            size: "2.4 MB",
-            type: "application/pdf",
-          },
-          {
-            id: 2,
-            name: "wireframes.zip",
-            size: "15.8 MB",
-            type: "application/zip",
-          },
-          {
-            id: 3,
-            name: "brand-guidelines.pdf",
-            size: "1.2 MB",
-            type: "application/pdf",
-          },
-        ],
-        applicants: 12,
-        createdAt: "2025-01-01",
-        estimatedDuration: "8-10 weeks",
-        experienceLevel: "Intermediate to Expert",
-        location: "Remote",
-        tags: ["React", "E-commerce", "Full-stack", "Remote"],
-      };
-
-      setTender(mockTender);
-      setLoading(false);
+      try {
+        const res = await tenderAPI.getById(id);
+        setTender(res.data);
+      } catch (error) {
+        console.error("Failed to fetch tender:", error);
+      } finally {
+        setLoading(false);
+      }
     };
-
     fetchTender();
   }, [id]);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "closed":
-        return "bg-red-100 text-red-800";
-      case "draft":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  useEffect(() => {
+    const checkApplication = async () => {
+      if (!user || user.role !== "bidder") {
+        setCheckingApplication(false);
+        return;
+      }
+      try {
+        const res = await applicationAPI.getMine(); // fetch current bidder's applications
+        const applied = res.data.some((app) => app.tender._id === tender._id);
+        setHasApplied(applied);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setCheckingApplication(false);
+      }
+    };
+
+    if (tender?._id) checkApplication();
+  }, [tender, user]);
+
+  const handleApply = async () => {
+    if (!user) {
+      alert("Please login to apply.");
+      navigate("/login");
+      return;
     }
-  };
-
-  const isDeadlineNear = (deadline) => {
-    const deadlineDate = new Date(deadline);
-    const today = new Date();
-    const diffTime = deadlineDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 7 && diffDays > 0;
-  };
-
-  const isExpired = (deadline) => {
-    const deadlineDate = new Date(deadline);
-    const today = new Date();
-    return deadlineDate < today;
-  };
-
-  const canApply = () => {
-    return (
-      isAuthenticated &&
-      user?.role === "bidder" &&
-      tender?.status === "active" &&
-      !isExpired(tender?.deadline)
-    );
+    if (user.role !== "bidder") {
+      alert("Only bidder accounts can apply to tenders.");
+      return;
+    }
+    navigate(`/tenders/${tender._id || tender.id}/apply`);
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-            <div className="h-32 bg-gray-200 rounded"></div>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600" />
+            <p className="text-gray-600">Loading tender details...</p>
           </div>
         </div>
       </Layout>
@@ -160,285 +147,329 @@ The ideal candidate should have experience with React.js, Node.js, and modern we
   if (!tender) {
     return (
       <Layout>
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-12">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Tender Not Found
-          </h1>
-          <p className="text-gray-600 mb-6">
-            The tender you're looking for doesn't exist or has been removed.
-          </p>
-          <Button asChild>
-            <Link to="/tenders">Browse Other Tenders</Link>
-          </Button>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <AlertCircle className="w-12 h-12 mx-auto text-gray-400" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Tender Not Found
+            </h2>
+            <p className="text-gray-600">
+              The tender you're looking for doesn't exist or has been removed.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Go Back
+            </Button>
+          </div>
         </div>
       </Layout>
     );
   }
 
+  const deadlineStatus = getDeadlineStatus(tender.deadline);
+
   return (
-    <Layout showSidebar>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl p-8">
-          <div className="flex items-center justify-between mb-4">
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Back Navigation */}
+          <div className="mb-6">
             <Button
               variant="ghost"
-              asChild
-              className="!text-white hover:bg-white/10"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             >
-              <Link to="/tenders">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Tenders
-              </Link>
+              <ArrowLeft className="w-4 h-4" /> Back to Tenders
             </Button>
-            <div className="flex items-center space-x-3">
-              <Badge
-                className={`${getStatusColor(tender.status)} border-white/20`}
-              >
-                {tender.status.charAt(0).toUpperCase() + tender.status.slice(1)}
-              </Badge>
-              <Badge variant="outline" className="border-white/20 text-white">
-                {tender.category}
-              </Badge>
-            </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold mb-4">{tender.title}</h1>
+          {/* Header Section */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <Building className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                      {tender.title}
+                    </h1>
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <span className="flex items-center gap-1">
+                        <Building className="w-4 h-4" />
+                        {tender.companyName || "Company not specified"}
+                      </span>
+                      {tender.category && (
+                        <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                          {tender.category}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-              {/* Quick Info */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="flex items-center text-sm text-blue-100">
-                  <Building className="h-4 w-4 mr-2" />
-                  <span>{tender.issuer}</span>
-                </div>
-                <div className="flex items-center text-sm text-blue-100">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  <span className="font-medium text-yellow-300">
-                    {tender.budget}
-                  </span>
-                </div>
-                <div className="flex items-center text-sm text-blue-100">
-                  <Calendar className="h-4 w-4 mr-2" />
+                <p className="text-gray-700 text-lg leading-relaxed mb-6">
+                  {tender.description}
+                </p>
+
+                {/* Deadline Status */}
+                <div className="flex items-center gap-2 mb-4">
+                  {deadlineStatus.icon && (
+                    <deadlineStatus.icon
+                      className={`w-5 h-5 text-${deadlineStatus.color}-600`}
+                    />
+                  )}
                   <span
-                    className={isExpired(tender.deadline) ? "text-red-300" : ""}
+                    className={`text-${deadlineStatus.color}-600 font-medium`}
                   >
-                    {tender.deadline}
+                    {deadlineStatus.text}
                   </span>
-                </div>
-                <div className="flex items-center text-sm text-blue-100">
-                  <Users className="h-4 w-4 mr-2" />
-                  <span>{tender.applicants} applicants</span>
+                  {tender.deadline && (
+                    <span className="text-gray-500">
+                      (Deadline: {formatDate(tender.deadline)})
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <FileText className="h-12 w-12 text-white" />
+
+              {/* Apply Button */}
+              {user?.role === "bidder" && !checkingApplication && (
+                <div className="lg:ml-8">
+                  <Button
+                    onClick={handleApply}
+                    size="lg"
+                    className={`w-full lg:w-auto px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-200
+        ${
+          hasApplied || deadlineStatus.status === "expired"
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+        }`}
+                    disabled={hasApplied || deadlineStatus.status === "expired"}
+                  >
+                    {hasApplied
+                      ? "Already Applied"
+                      : deadlineStatus.status === "expired"
+                      ? "Application Closed"
+                      : "Apply Now"}
+                  </Button>
+
+                  {deadlineStatus.status === "urgent" && !hasApplied && (
+                    <p className="text-sm text-orange-600 mt-2 text-center lg:text-left">
+                      ⚠️ Deadline approaching soon!
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        </div>
 
-        {/* Alerts */}
-        {isExpired(tender.deadline) && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              This tender has expired and is no longer accepting applications.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {isDeadlineNear(tender.deadline) && !isExpired(tender.deadline) && (
-          <Alert className="border-orange-200 bg-orange-50">
-            <Clock className="h-4 w-4 text-orange-600" />
-            <AlertDescription className="text-orange-800">
-              Deadline approaching! Only a few days left to apply.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Description */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm max-w-none">
-                  {tender.description.split("\n\n").map((paragraph, index) => (
-                    <p
-                      key={index}
-                      className="mb-4 text-gray-700 leading-relaxed"
-                    >
-                      {paragraph}
-                    </p>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Requirements */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Requirements & Skills</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {tender.requirements.map((req, index) => (
-                    <Badge key={index} variant="secondary">
-                      {req}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Files */}
-            {tender.files && tender.files.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Attached Files</CardTitle>
-                  <CardDescription>
-                    Download project files and documentation
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {tender.files.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <FileText className="h-5 w-5 text-gray-500" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {file.name}
-                            </p>
-                            <p className="text-xs text-gray-500">{file.size}</p>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Key Information Cards */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <Card className="hover:shadow-md transition-shadow border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                        <Calendar className="w-4 h-4 text-blue-600" />
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                      Deadline
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-gray-600">
+                      {formatDate(tender.deadline)}
+                    </div>
+                    <div
+                      className={`text-xs font-medium text-${deadlineStatus.color}-600 mt-1`}
+                    >
+                      {deadlineStatus.text}
+                    </div>
+                  </CardContent>
+                </Card>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Apply Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Apply for this Tender</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {canApply() ? (
-                  <>
-                    <Button className="w-full" size="lg">
-                      Submit Application
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Contact Issuer
-                    </Button>
-                  </>
-                ) : !isAuthenticated ? (
-                  <>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Sign in to apply for this tender
-                    </p>
-                    <Button asChild className="w-full">
-                      <Link to="/login">Sign In</Link>
-                    </Button>
-                  </>
-                ) : user?.role !== "bidder" ? (
-                  <Alert>
-                    <AlertDescription>
-                      Only bidders can apply for tenders.
-                    </AlertDescription>
-                  </Alert>
-                ) : isExpired(tender.deadline) ? (
-                  <Alert>
-                    <AlertDescription>
-                      This tender has expired and is no longer accepting
-                      applications.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <Alert>
-                    <AlertDescription>
-                      This tender is not currently accepting applications.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
+                <Card className="hover:shadow-md transition-shadow border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
+                        <DollarSign className="w-4 h-4 text-green-600" />
+                      </div>
+                      Budget Range
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {formatCurrency(tender.budgetMin)}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      to {formatCurrency(tender.budgetMax)}
+                    </div>
+                  </CardContent>
+                </Card>
 
-            {/* Project Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Duration</p>
-                  <p className="text-sm text-gray-600">
-                    {tender.estimatedDuration}
-                  </p>
-                </div>
+                <Card className="hover:shadow-md transition-shadow border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
+                        <Building className="w-4 h-4 text-purple-600" />
+                      </div>
+                      Category
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-gray-900">
+                      {tender.category || "Not specified"}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-                <Separator />
+              {/* Documents Section */}
+              {tender.documents?.length > 0 && (
+                <Card className="border-0 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-amber-600" />
+                      </div>
+                      Tender Documents
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-3">
+                      {tender.documents.map((doc, i) => (
+                        <a
+                          key={i}
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors group"
+                        >
+                          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                              {doc.originalName || `Document ${i + 1}`}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Click to download
+                            </div>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-gray-600 flex-shrink-0" />
+                        </a>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    Experience Level
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {tender.experienceLevel}
-                  </p>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Location</p>
-                  <p className="text-sm text-gray-600">{tender.location}</p>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Posted</p>
-                  <p className="text-sm text-gray-600">{tender.createdAt}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Tags */}
-            {tender.tags && tender.tags.length > 0 && (
-              <Card>
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Company Information */}
+              <Card className="border-0 shadow-sm">
                 <CardHeader>
-                  <CardTitle>Tags</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">
+                      <Building className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    Company Information
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {tender.tags.map((tag, index) => (
-                      <Badge key={index} variant="outline">
-                        {tag}
-                      </Badge>
-                    ))}
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Company Name
+                    </label>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {tender.companyName || "Not provided"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Registration Number
+                    </label>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {tender.registrationNumber || "Not provided"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      B-BBEE Level
+                    </label>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {tender.bbeeLevel || "Not specified"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      CIDB Grading
+                    </label>
+                    <p className="text-sm text-gray-900 mt-1">
+                      {tender.cidbGrading || "Not specified"}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
-            )}
+
+              {/* Contact Information */}
+              <Card className="border-0 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
+                      <User className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    Contact Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {tender.contactPerson && (
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Contact Person
+                      </label>
+                      <p className="text-sm text-gray-900 mt-1">
+                        {tender.contactPerson}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Email
+                    </label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <a
+                        href={`mailto:${tender.contactEmail}`}
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {tender.contactEmail || "Not provided"}
+                      </a>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Phone
+                    </label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <a
+                        href={`tel:${tender.contactPhone}`}
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {tender.contactPhone || "Not provided"}
+                      </a>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>

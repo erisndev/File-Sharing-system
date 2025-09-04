@@ -72,7 +72,7 @@ const TenderCard = ({ tender, showActions = true }) => {
           </Badge>
         </div>
         <CardTitle className="text-lg line-clamp-2 hover:text-blue-600 transition-colors">
-          <Link to={`/tenders/${tender.id}`}>{tender.title}</Link>
+          <Link to={`/tenders/${tender._id || tender.id}`}>{tender.title}</Link>
         </CardTitle>
         <CardDescription className="line-clamp-3">
           {tender.description}
@@ -149,11 +149,11 @@ const TenderCard = ({ tender, showActions = true }) => {
           <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="flex gap-2">
               <Button asChild className="flex-1" size="sm">
-                <Link to={`/tenders/${tender.id}`}>View Details</Link>
+                <Link to={`/tenders/${tender._id || tender.id}`}>View Details</Link>
               </Button>
               {tender.status === "active" && !isExpired(tender.deadline) && (
-                <Button variant="outline" size="sm" className="flex-1">
-                  Apply Now
+                <Button asChild variant="outline" size="sm" className="flex-1">
+                  <Link to={`/tenders/${tender._id || tender.id}/apply`}>Apply Now</Link>
                 </Button>
               )}
             </div>

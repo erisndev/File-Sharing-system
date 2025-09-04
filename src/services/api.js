@@ -129,11 +129,11 @@ export const tenderAPI = {
 
 // ================== Application (Bid) API ==================
 export const applicationAPI = {
-  apply: (tenderId, data) => api.post(`/applications/${tenderId}`, data),
+  apply: (tenderId, data, config = {}) => api.post(`/applications/${tenderId}`, data, config),
   withdraw: (id) => api.put(`/applications/${id}/withdraw`),
-  getByTender: (tenderId) => api.get(`/applications/received/${tenderId}`),
-  getByBidder: (bidderId) => api.get(`/applications/by-bidder/${bidderId}`),
-  getMine: () => api.get("/applications/my"),
+  getByTender: (tenderId, params) => api.get(`/applications/received/${tenderId}`, { params }),
+  getByBidder: (bidderId, params) => api.get(`/applications/by-bidder/${bidderId}`, { params }),
+  getMine: (params) => api.get("/applications/my", { params }),
   getById: (id) => api.get(`/applications/${id}`),
   updateStatus: (id, status) =>
     api.put(`/applications/${id}/status`, { status }),

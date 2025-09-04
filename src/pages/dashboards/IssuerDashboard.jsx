@@ -80,6 +80,7 @@ const IssuerDashboard = () => {
             applications.push({
               ...a,
               tenderTitle: tender.title,
+              tenderId: tender._id || tender.id,
             })
           );
         }
@@ -289,8 +290,10 @@ const IssuerDashboard = () => {
                             <Eye className="h-4 w-4 mr-1" />
                             View
                           </Button>
-                          <Button variant="outline" size="sm">
-                            Manage
+                          <Button asChild variant="outline" size="sm">
+                            <Link to={`/issuer/tenders/${tender._id || tender.id}/manage`}>
+                              Manage
+                            </Link>
                           </Button>
                         </div>
                       </CardContent>
@@ -355,8 +358,11 @@ const IssuerDashboard = () => {
                           <Button
                             size="sm"
                             className="text-xs bg-indigo-600 hover:bg-indigo-700"
+                            asChild
                           >
-                            Review
+                            <Link to={`/issuer/tenders/${app.tenderId}/manage`}>
+                              Review
+                            </Link>
                           </Button>
                         </div>
                       </CardContent>
@@ -394,13 +400,13 @@ const IssuerDashboard = () => {
                 },
                 {
                   title: "Applications",
-                  link: "/issuer/applications",
+                  link: "/issuer/tenders",
                   icon: Users,
                   color: "from-green-600 to-teal-600",
                 },
                 {
                   title: "Analytics",
-                  link: "/issuer/analytics",
+                  link: "/issuer/tenders",
                   icon: BarChart3,
                   color: "from-orange-600 to-red-600",
                 },

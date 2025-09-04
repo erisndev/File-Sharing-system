@@ -34,19 +34,17 @@ const AdminDashboard = () => {
       try {
         // Fetch users
         const usersRes = await authAPI.getAllUsers();
-        const users = Array.isArray(usersRes.data.users)
-          ? usersRes.data.users
-          : [];
+        const usersData =
+          usersRes.data?.users ?? usersRes.data?.items ?? usersRes.data ?? [];
+        const users = Array.isArray(usersData) ? usersData : [];
         const totalUsers = users.length;
 
         // Fetch tenders
         const tendersRes = await tenderAPI.getAll();
-        const tenders = Array.isArray(tendersRes.data.tenders)
-          ? tendersRes.data.tenders
-          : [];
-        const activeTenders = tenders.filter(
-          (t) => t.status === "active"
-        ).length;
+        const tendersData =
+          tendersRes.data?.items ?? tendersRes.data?.tenders ?? tendersRes.data ?? [];
+        const tenders = Array.isArray(tendersData) ? tendersData : [];
+        const activeTenders = tenders.filter((t) => t.status === "active").length;
         const totalTenders = tenders.length;
 
         // Example success rate calculation (adjust to your logic)

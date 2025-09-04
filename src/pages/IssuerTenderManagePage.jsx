@@ -40,6 +40,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { tenderAPI, applicationAPI } from "../services/api";
+import { useApplications } from "@/contexts/ApplicationContext";
 import TenderEditModal from "./TenderEditModal";
 
 export const IssuerTenderManagePage = () => {
@@ -51,6 +52,23 @@ export const IssuerTenderManagePage = () => {
   const [filterStatus, setFilterStatus] = useState("all");
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const { updateStatus } = useApplications();
+
+  const handleCloseTender = async () => {
+    if (!window.confirm("Close this tender? This will stop new applications.")) return;
+    try {
+      const res = await tenderAPI.update(tenderId, { status: "closed" });
+      const updated = res?.data?.tender || res?.data || { ...tender, status: "closed" };
+      setTender(updated);
+    } catch (e) {
+      alert(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Failed to close tender"
+      );
+    }
+  };
 
   // Fetch tender and applications
   const fetchTenderDetails = async () => {
@@ -77,7 +95,8 @@ export const IssuerTenderManagePage = () => {
   // Update application status
   const handleStatusUpdate = async (applicationId, status) => {
     try {
-      await applicationAPI.updateStatus(applicationId, status);
+      const res = await updateStatus(applicationId, status);
+      if (!res?.success) throw new Error(res?.error || "Update failed");
       setApplications((prev) =>
         prev.map((a) => (a._id === applicationId ? { ...a, status } : a))
       );
@@ -241,6 +260,16 @@ export const IssuerTenderManagePage = () => {
               <Edit className="h-4 w-4" />
               Edit Tender
             </Button>
+            {tender?.status !== "closed" && (
+              <Button
+                variant="outline"
+                onClick={handleCloseTender}
+                className="gap-2 rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50"
+              >
+                <XCircle className="h-4 w-4" />
+                Close Tender
+              </Button>
+            )}
             <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl">
               <Download className="h-4 w-4" />
               Export Data
@@ -700,6 +729,19 @@ export const IssuerTenderManagePage = () => {
                               >
                                 <UserCheck className="h-4 w-4" />
                                 Approve
+                              </Button>
+                            )}
+                            {app.status !== "won" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  handleStatusUpdate(app._id, "won")
+                                }
+                                className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 rounded-lg"
+                              >
+                                <Star className="h-4 w-4" />
+                                Award
                               </Button>
                             )}
                             {app.status !== "rejected" && (

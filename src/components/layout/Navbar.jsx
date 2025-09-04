@@ -101,9 +101,6 @@ const Navbar = () => {
                 className="relative text-gray-600 hover:text-blue-600 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 group overflow-hidden"
               >
                 <span className="relative z-10 flex items-center space-x-2">
-                  <span className="text-base opacity-70 group-hover:opacity-100 transition-opacity">
-                    {link.icon}
-                  </span>
                   <span>{link.label}</span>
                 </span>
                 <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -192,7 +189,7 @@ const Navbar = () => {
                       </DropdownMenuItem>
 
                       <DropdownMenuItem
-                        onClick={() => navigate("/settings")}
+                        onClick={() => navigate("/profile")}
                         className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer transition-all duration-300 mx-1 rounded-xl my-1 py-2.5 group"
                       >
                         <div className="p-1.5 bg-gray-100 rounded-lg group-hover:bg-white mr-3 transition-all duration-300">
@@ -271,7 +268,6 @@ const Navbar = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <span className="text-base">{link.icon}</span>
                 <span>{link.label}</span>
               </Link>
             ))}

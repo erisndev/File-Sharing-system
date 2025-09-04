@@ -138,9 +138,9 @@ export const IssuerTendersPage = () => {
 
   const formatCurrency = (amount) => {
     if (!amount) return "Not specified";
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-ZA", {
       style: "currency",
-      currency: "USD",
+      currency: "ZAR",
       notation: "compact",
       maximumFractionDigits: 1,
     }).format(amount);
